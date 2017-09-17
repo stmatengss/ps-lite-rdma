@@ -36,6 +36,7 @@ class ZMQVan : public Van {
   const static int N = 10;
   const static int qp_depth = 100;
   const static int rdma_buffer_size = 1024;
+  // static int port_num = 10086;
   m_ibv_res ibv_res[N];
   char *rdma_buffer;
 
@@ -43,8 +44,11 @@ class ZMQVan : public Van {
   virtual ~ZMQVan() { }
 
   void init_rdma() {
+
     ibv_res[0].ib_port = 1;
-    ibv_res[0].is_server = 1;
+    // ibv_res[0].is_server = 1;
+    // ibv_res[0].port = 10086;
+    ibv_res[0].model = M_RC;
 
     m_open_device_and_alloc_pd(&ibv_res[0]);
     m_reg_buffer(&ibv_res[0], rdma_buffer, rdma_buffer_size);
@@ -91,13 +95,13 @@ class ZMQVan : public Van {
 
   int Bind(const Node& node, int max_retry) override {
 
+    int port = node.port;
   #if USE_RDMA == 0
     receiver_ = zmq_socket(context_, ZMQ_ROUTER);
     CHECK(receiver_ != NULL)
         << "create receiver socket failed: " << zmq_strerror(errno);
     int local = GetEnv("DMLC_LOCAL", 0);
     std::string addr = local ? "ipc:///tmp/" : "tcp://*:";
-    int port = node.port;
     unsigned seed = static_cast<unsigned>(time(NULL)+port);
     for (int i = 0; i < max_retry+1; ++i) {
       auto address = addr + std::to_string(port);
@@ -110,13 +114,16 @@ class ZMQVan : public Van {
     }
   #else 
     // Server side action
+    ibv_res[0].is_server = 1;
+    ibv_res[0].port = 10086;
+
     m_sync(&ibv_res[0], " ", rdma_buffer);
     m_modify_qp_to_rts_and_rtr(&ibv_res[0]);
   #endif
     return port;
   }
 
-  void Connect(const Node& 0) override {
+  void Connect(const Node& node) override {
 
   #if USE_RDMA == 0
     CHECK_NE(node.id, node.kEmpty);
@@ -157,8 +164,8 @@ class ZMQVan : public Van {
 
   int SendMsg(const Message& msg) override {
     std::lock_guard<std::mutex> lk(mu_);
-  #if USE_RDMA == 0
     // find the socket
+  #if USE_RDMA == 0
     int id = msg.meta.recver;
     CHECK_NE(id, Meta::kEmpty);
     auto it = senders_.find(id);
@@ -204,10 +211,11 @@ class ZMQVan : public Van {
       zmq_msg_close(&data_msg);
       send_bytes += data_size;
     }
+    return send_bytes;
   #else 
+    return 0;
     // TODO ibv_post_send
   #endif
-    return send_bytes;
   }
 
   int RecvMsg(Message* msg) override {

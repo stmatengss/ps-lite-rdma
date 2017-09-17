@@ -368,7 +368,7 @@ m_modify_qp_to_rts_and_rtr(struct m_ibv_res *ibv_res) {
  * TODO
  * */
 static void 
-m_sycn(struct m_ibv_res *ibv_res, const char *server, char *buffer) {
+m_sync(struct m_ibv_res *ibv_res, const char *server, char *buffer) {
 		ibv_res->lparam = (struct m_param *)malloc(sizeof(struct m_param));
 		ibv_res->lparam->psn = lrand48() & 0xffffff;
 		ibv_res->lparam->qpn = ibv_res->qp->qp_num;
