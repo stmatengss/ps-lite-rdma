@@ -43,6 +43,9 @@ class ZMQVan : public Van {
   virtual ~ZMQVan() { }
 
   void init_rdma() {
+    ibv_res[0].ib_port = 1;
+    ibv_res[0].is_server = 1;
+
     m_open_device_and_alloc_pd(&ibv_res[0]);
     m_reg_buffer(&ibv_res[0], rdma_buffer, rdma_buffer_size);
     m_create_cq_and_qp(&ibv_res[0], qp_depth, IBV_QPT_RC);
@@ -87,8 +90,8 @@ class ZMQVan : public Van {
   }
 
   int Bind(const Node& node, int max_retry) override {
-    
-  if USE_RDMA == 0
+
+  #if USE_RDMA == 0
     receiver_ = zmq_socket(context_, ZMQ_ROUTER);
     CHECK(receiver_ != NULL)
         << "create receiver socket failed: " << zmq_strerror(errno);
@@ -106,12 +109,16 @@ class ZMQVan : public Van {
       }
     }
   #else 
-
+    // Server side action
+    m_sync(&ibv_res[0], " ", rdma_buffer);
+    m_modify_qp_to_rts_and_rtr(&ibv_res[0]);
   #endif
     return port;
   }
 
-  void Connect(const Node& node) override {
+  void Connect(const Node& 0) override {
+
+  #if USE_RDMA == 0
     CHECK_NE(node.id, node.kEmpty);
     CHECK_NE(node.port, node.kEmpty);
     CHECK(node.hostname.size());
@@ -143,10 +150,14 @@ class ZMQVan : public Van {
       LOG(FATAL) <<  "connect to " + addr + " failed: " + zmq_strerror(errno);
     }
     senders_[id] = sender;
+  #else 
+    //Client side action
+  #endif
   }
 
   int SendMsg(const Message& msg) override {
     std::lock_guard<std::mutex> lk(mu_);
+  #if USE_RDMA == 0
     // find the socket
     int id = msg.meta.recver;
     CHECK_NE(id, Meta::kEmpty);
@@ -193,12 +204,16 @@ class ZMQVan : public Van {
       zmq_msg_close(&data_msg);
       send_bytes += data_size;
     }
+  #else 
+    // TODO ibv_post_send
+  #endif
     return send_bytes;
   }
 
   int RecvMsg(Message* msg) override {
     msg->data.clear();
     size_t recv_bytes = 0;
+  #if USE_RDMA == 0
     for (int i = 0; ; ++i) {
       zmq_msg_t* zmsg = new zmq_msg_t;
       CHECK(zmq_msg_init(zmsg) == 0) << zmq_strerror(errno);
@@ -238,6 +253,9 @@ class ZMQVan : public Van {
         if (!zmq_msg_more(zmsg)) { break; }
       }
     }
+  #else 
+    // TODO ibv_post_recv
+  #endif
     return recv_bytes;
   }
 
