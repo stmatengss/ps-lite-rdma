@@ -158,6 +158,11 @@ class ZMQVan : public Van {
     }
     senders_[id] = sender;
   #else 
+    ibv_res[0].is_server = 0;
+    ibv_res[0].port = 10086;
+
+    m_sync(&ibv_res[0], node.hostname.c_str(), rdma_buffer);
+    m_modify_qp_to_rts_and_rtr(&ibv_res[0]);
     //Client side action
   #endif
   }
