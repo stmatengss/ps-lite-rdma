@@ -67,7 +67,7 @@ struct m_ibv_res {
 
 #define CPEN(ret) if (ret == NULL) { \
 		PRINT_LINE \
-		printf("ERROR: %s\n", strerror(errno)); \
+		printf("ERROR: %s\n", strerror(h_errno)); \
 		printf("ERROR: NULL\n"); \
 		exit(1); \
 } 
@@ -118,7 +118,9 @@ m_client_exchange(const char *server, uint16_t port, struct m_param *lparam,
 				exit(1);
 		}
 
-		struct hostent *hent = gethostbyname(server);
+		printf("[Server Name] %s\n", server);
+		// struct hostent *hent = gethostbyaddr(server, 4, AF_INET);
+		struct hostent *hent = gethostbyname("teaker-11");
 		CPEN(hent);
 
 		ssize_t tmp; // None-sense
@@ -212,9 +214,9 @@ static int
 m_get_lid (struct m_ibv_res *ibv_res) {
 		struct ibv_port_attr port_attr;
 		CPEN(ibv_res->ctx);
-		printf("IB Port %d\n", ibv_res->ib_port);
+		// printf("IB Port %d\n", ibv_res->ib_port);
 		CPE(ibv_query_port(ibv_res->ctx, ibv_res->ib_port, &port_attr));
-		printf("Get LID %x\n", port_attr.lid);
+		// printf("Get LID %x\n", port_attr.lid);
 		return port_attr.lid;
 }
 
@@ -271,7 +273,7 @@ m_init_qp (struct m_ibv_res *ibv_res) {
 				flags |= IBV_QP_ACCESS_FLAGS;
 		}
 		CPE(ibv_modify_qp(ibv_res->qp, &qp_attr, flags));
-		printf("QPNum = %d\n", ibv_res->qp->qp_num);
+		// printf("QPNum = %d\n", ibv_res->qp->qp_num);
 }
 
 static void
@@ -383,13 +385,14 @@ m_sync(struct m_ibv_res *ibv_res, const char *server, char *buffer) {
 		ibv_res->rparam = (struct m_param *)malloc(sizeof(struct m_param));
 		ibv_res->rpriv_data = (struct m_priv_data *)malloc(sizeof(struct m_priv_data));
 
-		printf("Local LID = %d, QPN = %d, PSN = %d\n", 
-						ibv_res->lparam->lid, ibv_res->lparam->qpn, ibv_res->lparam->psn);
-		printf("Local Addr = %ld, RKey = %d, LEN = %zu\n",
-						ibv_res->lpriv_data->buffer_addr, ibv_res->lpriv_data->buffer_rkey,
-					   	ibv_res->lpriv_data->buffer_length);
+		// printf("Local LID = %d, QPN = %d, PSN = %d\n", 
+		// 				ibv_res->lparam->lid, ibv_res->lparam->qpn, ibv_res->lparam->psn);
+		// printf("Local Addr = %ld, RKey = %d, LEN = %zu\n",
+		// 				ibv_res->lpriv_data->buffer_addr, ibv_res->lpriv_data->buffer_rkey,
+		// 			   	ibv_res->lpriv_data->buffer_length);
 
 		struct m_param param;
+		printf("[server: %d][port: %d]\n", ibv_res->is_server, ibv_res->port);
 		if (ibv_res->is_server) {
 //				ibv_res->rparam = m_server_exchange(ibv_res->port, ibv_res->lparam);
 				m_server_exchange(ibv_res->port, ibv_res->lparam, ibv_res->lpriv_data,

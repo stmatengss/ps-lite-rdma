@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <thread>
 #include <string>
+#include <atomic>
 #include "ps/internal/van.h"
 #include "libmrdma.h"
 #if _MSC_VER
@@ -33,26 +34,48 @@ inline void FreeData(void *data, void *hint) {
 
 class ZMQVan : public Van {
  public:
+  std::atomic<int> port_counter;
   const static int N = 10;
   const static int qp_depth = 100;
   const static int rdma_buffer_size = 1024;
   // static int port_num = 10086;
   m_ibv_res ibv_res[N];
-  char *rdma_buffer;
+  m_ibv_res ibv_res_recv[N];
+  int recv_counter = 0;
+  char *rdma_buffer[N];
+  char *rdma_buffer_recv[N];
+  std::thread connect_th[N];
 
   ZMQVan() { }
   virtual ~ZMQVan() { }
 
   void init_rdma() {
+    port_counter = -1;
+    for (int i = 0; i < 3; i ++ ) {
+      ibv_res[i].ib_port = 1;
+  // ibv_res[0].is_server = 1;
+  // ibv_res[0].port = 10086;
+      ibv_res[i].model = M_RC;
 
-    ibv_res[0].ib_port = 1;
-    // ibv_res[0].is_server = 1;
-    // ibv_res[0].port = 10086;
-    ibv_res[0].model = M_RC;
+      rdma_buffer[i] = new char[rdma_buffer_size];
 
-    m_open_device_and_alloc_pd(&ibv_res[0]);
-    m_reg_buffer(&ibv_res[0], rdma_buffer, rdma_buffer_size);
-    m_create_cq_and_qp(&ibv_res[0], qp_depth, IBV_QPT_RC);
+      m_open_device_and_alloc_pd(&ibv_res[i]);
+      m_reg_buffer(&ibv_res[i], rdma_buffer[i], rdma_buffer_size);
+      m_create_cq_and_qp(&ibv_res[i], qp_depth, IBV_QPT_RC);
+    }
+    for (int i = 0; i < 3; i ++ ) {
+      ibv_res_recv[i].ib_port = 1;
+  // ibv_res[0].is_server = 1;
+  // ibv_res[0].port = 10086;
+      ibv_res_recv[i].model = M_RC;
+
+      rdma_buffer_recv[i] = new char[rdma_buffer_size];
+
+      m_open_device_and_alloc_pd(&ibv_res_recv[i]);
+      m_reg_buffer(&ibv_res_recv[i], rdma_buffer_recv[i], rdma_buffer_size);
+      m_create_cq_and_qp(&ibv_res_recv[i], qp_depth, IBV_QPT_RC);
+    }
+    printf("==================Init Finish==================\n");
   }
 
  protected:
@@ -96,6 +119,8 @@ class ZMQVan : public Van {
   int Bind(const Node& node, int max_retry) override {
 
     int port = node.port;
+    std::cout << "[Bind]" << node.DebugString() << std::endl;
+
   #if USE_RDMA == 0
     receiver_ = zmq_socket(context_, ZMQ_ROUTER);
     CHECK(receiver_ != NULL)
@@ -114,17 +139,32 @@ class ZMQVan : public Van {
     }
   #else 
     // Server side action
-    ibv_res[0].is_server = 1;
-    ibv_res[0].port = 10086;
+    for (int i = 0; i < 3; i ++ ) {
+      ibv_res[i].is_server = 1;
+      ibv_res[i].port = port + i;
 
-    m_sync(&ibv_res[0], " ", rdma_buffer);
-    m_modify_qp_to_rts_and_rtr(&ibv_res[0]);
+      printf("[%d][%d][%d]Waiting\n", i, static_cast<int>(node.role), port + i );
+      
+      connect_th[i] = std::thread([&](m_ibv_res &ibv_res){
+
+        m_sync(&ibv_res, "XXX", rdma_buffer[i]);
+        m_modify_qp_to_rts_and_rtr(&ibv_res);
+      }, std::ref(ibv_res[i]));
+    }
+    
+    for (int i = 0; i < 3; i ++ ) {
+      connect_th[i].join();
+    }
+
   #endif
+
     return port;
   }
 
   void Connect(const Node& node) override {
 
+    std::cout << "[Connect]" << node.DebugString() << std::endl;
+    // debug_print("[%s][%d] Connext Begin!\n", node.hostname.c_str(), node.port);
   #if USE_RDMA == 0
     CHECK_NE(node.id, node.kEmpty);
     CHECK_NE(node.port, node.kEmpty);
@@ -158,11 +198,21 @@ class ZMQVan : public Van {
     }
     senders_[id] = sender;
   #else 
-    ibv_res[0].is_server = 0;
-    ibv_res[0].port = node.port;
 
-    m_sync(&ibv_res[0], node.hostname.c_str(), rdma_buffer);
-    m_modify_qp_to_rts_and_rtr(&ibv_res[0]);
+    port_counter ++;
+
+    ibv_res_recv[port_counter].is_server = 0;
+    // printf("port_counter: %d\n", port_counter);
+    ibv_res_recv[port_counter].port = node.port + port_counter;
+    
+    std::cout << std::this_thread::get_id() << std::endl;
+    printf("[%d][%d]Waiting\n", static_cast<int>(node.role), ibv_res_recv[port_counter].port );
+
+    m_sync(&ibv_res_recv[port_counter], node.hostname.c_str(), rdma_buffer_recv[port_counter]);
+    // connect_th.join();
+
+    m_modify_qp_to_rts_and_rtr(&ibv_res_recv[port_counter]);
+
     //Client side action
   #endif
   }
@@ -278,7 +328,7 @@ class ZMQVan : public Van {
    * Counter generator for providing random port number 
    */
   static int ID() {
-    static int ID = 10086;
+    static int ID = 0;
     return ID ++;
   }
   /**

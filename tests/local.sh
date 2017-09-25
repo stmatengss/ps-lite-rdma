@@ -19,6 +19,7 @@ export DMLC_PS_ROOT_PORT=8000
 export DMLC_ROLE='scheduler'
 ${bin} ${arg} &
 
+sleep 4 
 
 # start servers
 export DMLC_ROLE='server'
@@ -27,6 +28,7 @@ for ((i=0; i<${DMLC_NUM_SERVER}; ++i)); do
     ${bin} ${arg} &
 done
 
+sleep 4
 # start workers
 export DMLC_ROLE='worker'
 for ((i=0; i<${DMLC_NUM_WORKER}; ++i)); do

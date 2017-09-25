@@ -10,6 +10,7 @@
 
 namespace ps {
 Postoffice::Postoffice() {
+  printf("Create PS\n");
   van_ = Van::Create("zmq");
   env_ref_ = Environment::_GetSharedRef();
   const char* val = NULL;
@@ -33,6 +34,7 @@ void Postoffice::Start(const char* argv0, const bool do_barrier) {
     dmlc::InitLogging("ps-lite\0");
   }
 
+  // printf("[workers: %d][servers: %d]\n" ,num_workers_, num_servers_);
   // init node info.
   for (int i = 0; i < num_workers_; ++i) {
     int id = WorkerRankToID(i);

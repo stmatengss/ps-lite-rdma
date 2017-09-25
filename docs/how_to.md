@@ -52,7 +52,7 @@ managers besides the provided ones such as `ssh`, `mpirun`, `yarn` and `sge`.
 To start a PS-Lite node, we need to give proper values to the following
 environment variables.
 - `DMLC_NUM_WORKER` : the number of workers
-- `DMLC_NUM_SERVER` : the number of servers
+- `DMLC_NUM_SERVER` : the number of servers 
 - `DMLC_ROLE` : the role of the current node, can be `worker`, `server`, or `scheduler`
 - `DMLC_PS_ROOT_URI` : the ip or hostname of the scheduler node
 - `DMLC_PS_ROOT_PORT` : the port that the scheduler node is listening

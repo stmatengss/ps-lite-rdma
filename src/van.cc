@@ -72,12 +72,22 @@ void Van::Start() {
   }
 
   // bind.
-  my_node_.port = Bind(my_node_, is_scheduler_ ? 0 : 40);
-  PS_VLOG(1) << "Bind to " << my_node_.DebugString();
-  CHECK_NE(my_node_.port, -1) << "bind failed";
+  std::thread bind_th([&](){
+    my_node_.port = Bind(my_node_, is_scheduler_ ? 0 : 40);
+    PS_VLOG(1) << "Bind to " << my_node_.DebugString();
+    CHECK_NE(my_node_.port, -1) << "bind failed";
+  });
 
+  sleep(1);
   // connect to the scheduler
-  Connect(scheduler_);
+  std::thread connect_th([&](){
+    sleep(1);
+    printf("Connect\n");
+    Connect(scheduler_);
+  });
+
+  connect_th.join();
+  bind_th.join();
 
   // for debug use
   if (Environment::Get()->find("PS_DROP_MSG")) {

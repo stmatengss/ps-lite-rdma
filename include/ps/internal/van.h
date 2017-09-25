@@ -119,6 +119,8 @@ class Van {
   std::unique_ptr<std::thread> receiver_thread_;
   /** the thread for sending heartbeat */
   std::unique_ptr<std::thread> heartbeat_thread_;
+  std::unique_ptr<std::thread> bind_th;
+  std::unique_ptr<std::thread> connect_th;
   std::vector<int> barrier_count_;
   /** msg resender */
   Resender* resender_ = nullptr;
