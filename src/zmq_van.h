@@ -211,6 +211,7 @@ class ZMQVan : public Van {
         LOG(WARNING) << "failed to send message to node [" << id
                      << "] errno: " << errno << " " << zmq_strerror(errno)
                      << ". " << i << "/" << n;
+                     
         return -1;
       }
       zmq_msg_close(&data_msg);
