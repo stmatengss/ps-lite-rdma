@@ -159,7 +159,7 @@ class ZMQVan : public Van {
     senders_[id] = sender;
   #else 
     ibv_res[0].is_server = 0;
-    ibv_res[0].port = 10086;
+    ibv_res[0].port = node.port;
 
     m_sync(&ibv_res[0], node.hostname.c_str(), rdma_buffer);
     m_modify_qp_to_rts_and_rtr(&ibv_res[0]);
@@ -274,6 +274,13 @@ class ZMQVan : public Van {
   }
 
  private:
+  /*
+   * Counter generator for providing random port number 
+   */
+  static int ID() {
+    static int ID = 10086;
+    return ID ++;
+  }
   /**
    * return the node id given the received identity
    * \return -1 if not find

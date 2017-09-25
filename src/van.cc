@@ -14,6 +14,7 @@
 #include "./resender.h"
 namespace ps {
 
+#define debug_print(s) printf(s)
 // interval in second between to heartbeast signals. 0 means no heartbeat.
 // don't send heartbeast in default. because if the scheduler received a
 // heartbeart signal from a node before connected to that node, then it could be
