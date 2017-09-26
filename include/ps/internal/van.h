@@ -73,7 +73,7 @@ class Van {
   /**
    * \brief connect to a node
    */
-  virtual void Connect(const Node& node) = 0;
+  virtual void Connect(Node& node) = 0;
   /**
    * \brief bind to my node
    * do multiple retries on binding the port. since it's possible that

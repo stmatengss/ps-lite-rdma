@@ -284,7 +284,7 @@ void Van::Receiving() {
             }
           }
         } else {
-          for (const auto& node : ctrl.node) {
+          for (auto& node : ctrl.node) { //const variable before
             Connect(node);
             if (!node.is_recovery && node.role == Node::SERVER) ++num_servers_;
             if (!node.is_recovery && node.role == Node::WORKER) ++num_workers_;

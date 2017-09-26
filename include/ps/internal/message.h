@@ -64,7 +64,7 @@ struct Node {
   /** \brief the empty value */
   static const int kEmpty;
   /** \brief default constructor */
-  Node() : id(kEmpty), port(kEmpty), is_recovery(false) {}
+  Node() : id(kEmpty), port(kEmpty), is_recovery(false), port_offset(0) {}
   /** \brief node roles */
   enum Role { SERVER, WORKER, SCHEDULER };
   /** \brief get debug string */
@@ -92,6 +92,8 @@ struct Node {
   int port;
   /** \brief whether this node is created by failover */
   bool is_recovery;
+  /** counter for fucking connection */
+  int port_offset;
 };
 /**
  * \brief meta info of a system control message

@@ -34,7 +34,7 @@ inline void FreeData(void *data, void *hint) {
 
 class ZMQVan : public Van {
  public:
-  std::atomic<int> port_counter;
+  // std::atomic<int> port_counter;
   const static int N = 10;
   const static int qp_depth = 100;
   const static int rdma_buffer_size = 1024;
@@ -50,7 +50,7 @@ class ZMQVan : public Van {
   virtual ~ZMQVan() { }
 
   void init_rdma() {
-    port_counter = -1;
+    // port_counter = -1;
     for (int i = 0; i < 3; i ++ ) {
       ibv_res[i].ib_port = 1;
   // ibv_res[0].is_server = 1;
@@ -143,7 +143,7 @@ class ZMQVan : public Van {
       ibv_res[i].is_server = 1;
       ibv_res[i].port = port + i;
 
-      printf("[%d][%d][%d]Waiting\n", i, static_cast<int>(node.role), port + i );
+      printf("[Bind][%d][%d][%d]Waiting\n", i, static_cast<int>(node.role), port + i );
       
       connect_th[i] = std::thread([&](m_ibv_res &ibv_res){
 
@@ -161,7 +161,7 @@ class ZMQVan : public Van {
     return port;
   }
 
-  void Connect(const Node& node) override {
+  void Connect(Node& node) override {
 
     std::cout << "[Connect]" << node.DebugString() << std::endl;
     // debug_print("[%s][%d] Connext Begin!\n", node.hostname.c_str(), node.port);
@@ -198,15 +198,30 @@ class ZMQVan : public Van {
     }
     senders_[id] = sender;
   #else 
+    printf("hash_code: %p\n", &node);
 
+    int port_counter = node.port_offset ++;
+
+    ibv_res_recv[port_counter].is_server = 0;
+    // printf("port_counter: %d\n", port_counter);
+    ibv_res_recv[port_counter].port = node.port + port_counter;
+    
+    // std::cout << std::this_thread::get_id() << std::endl;
+    printf("[Connect][%d][%d]Waiting\n", static_cast<int>(node.role), ibv_res_recv[port_counter].port );
+
+    m_sync(&ibv_res_recv[port_counter], node.hostname.c_str(), rdma_buffer_recv[port_counter]);
+    // connect_th.join();
+
+    m_modify_qp_to_rts_and_rtr(&ibv_res_recv[port_counter]);
+  #if 0
     port_counter ++;
 
     ibv_res_recv[port_counter].is_server = 0;
     // printf("port_counter: %d\n", port_counter);
     ibv_res_recv[port_counter].port = node.port + port_counter;
     
-    std::cout << std::this_thread::get_id() << std::endl;
-    printf("[%d][%d]Waiting\n", static_cast<int>(node.role), ibv_res_recv[port_counter].port );
+    // std::cout << std::this_thread::get_id() << std::endl;
+    printf("[Connect][%d][%d]Waiting\n", static_cast<int>(node.role), ibv_res_recv[port_counter].port );
 
     m_sync(&ibv_res_recv[port_counter], node.hostname.c_str(), rdma_buffer_recv[port_counter]);
     // connect_th.join();
@@ -214,6 +229,8 @@ class ZMQVan : public Van {
     m_modify_qp_to_rts_and_rtr(&ibv_res_recv[port_counter]);
 
     //Client side action
+  #endif
+
   #endif
   }
 

@@ -124,7 +124,7 @@ m_client_exchange(const char *server, uint16_t port, struct m_param *lparam,
 		CPEN(hent);
 
 		ssize_t tmp; // None-sense
-
+#if 0
 		struct sockaddr_in sin;
 		FILL(sin);
 		sin.sin_family = PF_INET;
@@ -133,7 +133,21 @@ m_client_exchange(const char *server, uint16_t port, struct m_param *lparam,
 
 		m_nano_sleep(500000000);
 		CPE((connect(s, (struct sockaddr *)&sin, sizeof(sin)) == -1));
+#else 
+		for (int i = 0; i < 10; i ++) {
+			struct sockaddr_in sin;
+			FILL(sin);
+			sin.sin_family = PF_INET;
+			sin.sin_port = htons(port + i);
+			sin.sin_addr = *((struct in_addr *)hent->h_addr);
 
+			m_nano_sleep(500000000);
+			if ((connect(s, (struct sockaddr *)&sin, sizeof(sin)) != -1)) {
+				break;
+			}
+		}
+		
+#endif
 //		PRINT_LINE
 
 		tmp = write(s, lparam, sizeof(*lparam));
