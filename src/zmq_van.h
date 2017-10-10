@@ -35,7 +35,7 @@ inline void FreeData(void *data, void *hint) {
 class ZMQVan : public Van {
  public:
   // std::atomic<int> port_counter;
-  const static int N = 10;
+  const static int N = 20;
   const static int qp_depth = 100;
   const static int rdma_buffer_size = 1024;
   // static int port_num = 10086;
@@ -46,12 +46,21 @@ class ZMQVan : public Van {
   char *rdma_buffer_recv[N];
   std::thread connect_th[N];
 
+  // Define Variable before
+  void *context_ = nullptr;
+  /**
+   * \brief node_id to the socket for sending data to this node
+   */
+  std::unordered_map<int, void*> senders_;
+  std::mutex mu_;
+  void *receiver_ = nullptr;
+
   ZMQVan() { }
   virtual ~ZMQVan() { }
 
   void init_rdma() {
     // port_counter = -1;
-    for (int i = 0; i < 3; i ++ ) {
+    for (int i = 0; i < N; i ++ ) {
       ibv_res[i].ib_port = 1;
   // ibv_res[0].is_server = 1;
   // ibv_res[0].port = 10086;
@@ -63,7 +72,7 @@ class ZMQVan : public Van {
       m_reg_buffer(&ibv_res[i], rdma_buffer[i], rdma_buffer_size);
       m_create_cq_and_qp(&ibv_res[i], qp_depth, IBV_QPT_RC);
     }
-    for (int i = 0; i < 3; i ++ ) {
+    for (int i = 0; i < N; i ++ ) {
       ibv_res_recv[i].ib_port = 1;
   // ibv_res[0].is_server = 1;
   // ibv_res[0].port = 10086;
@@ -112,7 +121,8 @@ class ZMQVan : public Van {
     }
     zmq_ctx_destroy(context_);
   #else
-    //XXX
+    // XXX
+    // Free allocation buffers
   #endif
   }
 
@@ -164,12 +174,12 @@ class ZMQVan : public Van {
   void Connect(Node& node) override {
 
     std::cout << "[Connect]" << node.DebugString() << std::endl;
+    int id = node.id;
     // debug_print("[%s][%d] Connext Begin!\n", node.hostname.c_str(), node.port);
   #if USE_RDMA == 0
     CHECK_NE(node.id, node.kEmpty);
     CHECK_NE(node.port, node.kEmpty);
     CHECK(node.hostname.size());
-    int id = node.id;
     auto it = senders_.find(id);
     if (it != senders_.end()) {
       zmq_close(it->second);
@@ -205,7 +215,7 @@ class ZMQVan : public Van {
     ibv_res_recv[port_counter].is_server = 0;
     // printf("port_counter: %d\n", port_counter);
     ibv_res_recv[port_counter].port = node.port + port_counter;
-    
+
     // std::cout << std::this_thread::get_id() << std::endl;
     printf("[Connect][%d][%d]Waiting\n", static_cast<int>(node.role), ibv_res_recv[port_counter].port );
 
@@ -213,6 +223,8 @@ class ZMQVan : public Van {
     // connect_th.join();
 
     m_modify_qp_to_rts_and_rtr(&ibv_res_recv[port_counter]);
+    
+    senders_[id] = &ibv_res_recv[port_counter];
   #if 0
     port_counter ++;
 
@@ -237,7 +249,6 @@ class ZMQVan : public Van {
   int SendMsg(const Message& msg) override {
     std::lock_guard<std::mutex> lk(mu_);
     // find the socket
-  #if USE_RDMA == 0
     int id = msg.meta.recver;
     CHECK_NE(id, Meta::kEmpty);
     auto it = senders_.find(id);
@@ -245,6 +256,7 @@ class ZMQVan : public Van {
       LOG(WARNING) << "there is no socket to node " << id;
       return -1;
     }
+  #if USE_RDMA == 0
     void *socket = it->second;
 
     // send meta
@@ -368,13 +380,6 @@ class ZMQVan : public Van {
     return Meta::kEmpty;
   }
 
-  void *context_ = nullptr;
-  /**
-   * \brief node_id to the socket for sending data to this node
-   */
-  std::unordered_map<int, void*> senders_;
-  std::mutex mu_;
-  void *receiver_ = nullptr;
 };
 }  // namespace ps
 
